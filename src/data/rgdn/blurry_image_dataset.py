@@ -11,7 +11,7 @@ from sklearn.feature_extraction import image
 from skimage.color import rgb2gray
 from torch.utils.data import Dataset
 
-from src.data.make_kernel import kernel_sim_spline
+from src.data.rgdn.make_kernel import kernel_sim_spline
 
 
 class ToTensor(object):
