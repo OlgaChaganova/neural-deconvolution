@@ -1,6 +1,8 @@
+import logging
 import typing as tp
 
 import numpy as np
+import torch
 
 
 def fft(inp: np.array, shape: tuple = None) -> np.array:
@@ -58,3 +60,25 @@ def convolve(
         return np.transpose(res, (1, 2, 0)).astype(data_type)
     else:
         raise ValueError(f'Image must be 2- or 3-dimencional but got {ndim}-dimencional image.')
+
+
+def convolve_tensors(
+    image: tp.Union[np.array, torch.tensor],
+    psf: tp.Union[np.array, torch.tensor],
+) -> torch.tensor:
+    """Convolve tensors (used in USRNet)."""
+    if psf.sum() != 1:
+        psf /= psf.sum()
+        logging.warning('PSF has sum more than 1. Normed')
+    if type(image) == np.ndarray:
+        image = image.astype(np.float) / 255.
+        image = torch.DoubleTensor(image)
+        
+    if type(psf) == np.ndarray:
+        psf = torch.DoubleTensor(psf / np.sum(psf)) 
+    
+    conv_image = torch.zeros(image.shape)
+    for i in range(image.shape[2]):
+        conv_channel = torch.real(torch.fft.ifftn(torch.fft.fftn(image[..., i]) * torch.fft.fftn(psf)))
+        conv_image[..., i] = torch.fft.fftshift(conv_channel)
+    return conv_image
