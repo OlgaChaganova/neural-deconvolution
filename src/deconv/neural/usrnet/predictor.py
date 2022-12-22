@@ -21,7 +21,7 @@ class USRNetPredictor(object):
         self,
         model_path: str,
         scale_factor: int = 1,
-        noise_level_model: float = 0,
+        noise_level: float = 0,
         device: tp.Literal['cpu', 'cuda', 'auto'] = 'auto',
     ):
         self._device = (
@@ -44,16 +44,31 @@ class USRNetPredictor(object):
         self._model = load_weights(model=model, model_path=model_path).to(self._device)
 
         self._scale_factor = scale_factor
-        self._noise_level_model = noise_level_model
+        self._noise_level = noise_level
     
-    def forward(self, blurred_image: torch.tensor, psf: torch.tensor) -> np.array:
+    def forward(self, blurred_image: torch.tensor, psf: torch.tensor, noise_level: float = None) -> np.array:
+        """Forward pass.
+
+        Parameters
+        ----------
+        blurred_image : torch.tensor
+            Blurred image. Shape: [num_channels, height, width]
+        psf : torch.tensor
+            PSF. Shape: [height, width]
+
+        Returns
+        -------
+        np.array
+           Restored image. Shape: [bs, num_channels, height, width]
+        """
         blurred_image, psf = self._preprocess(blurred_image, psf)
-        return self._forward(blurred_image, psf).cpu().numpy()
+        return self._forward(blurred_image, psf, noise_level).cpu().permute(0, 2, 3, 1).numpy()
     
-    def _forward(self, blurred_image: torch.tensor, psf: torch.tensor) -> torch.tensor:
+    def _forward(self, blurred_image: torch.tensor, psf: torch.tensor, noise_level: float = None) -> torch.tensor:
         blurred_image = blurred_image.to(self._device)
         psf = psf.to(self._device)
-        sigma = torch.tensor(self._noise_level_model).float().view([1, 1, 1, 1]).to(self._device)
+        noise_level = noise_level if noise_level is not None else self._noise_level
+        sigma = torch.tensor(noise_level).float().view([1, 1, 1, 1]).to(self._device)
         return self._model(blurred_image, psf, self._scale_factor, sigma)
     
     def _preprocess(self, blurred_image: np.array, psf: np.array) -> tp.Tuple[torch.tensor, torch.tensor]:
