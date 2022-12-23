@@ -49,15 +49,28 @@ def convolve(
     scale_output: bool = True,
     data_type: tp.Any = np.float32
 ) -> np.array:
+    """Convolve multichannel images using FFT."""
+
+    if psf.sum() != 1:
+        psf /= psf.sum()
+        logging.warning('PSF has sum more than 1. Normed')
+    
+    if np.ceil(image.max()) == 255:
+        image = image / image.max()
+        logging.warning('Image pixels are not in 0..1. Normed')
+
     ndim = image.ndim
+
     if ndim == 2:
         return fft_conv(image, psf, scale_output).astype(data_type)
+
     elif ndim == 3:
         res = []
         for i in range(image.shape[-1]):
             res.append(fft_conv(image[..., i], psf, scale_output=scale_output))
         res = np.stack(res)
         return np.transpose(res, (1, 2, 0)).astype(data_type)
+
     else:
         raise ValueError(f'Image must be 2- or 3-dimencional but got {ndim}-dimencional image.')
 
@@ -67,9 +80,11 @@ def convolve_tensors(
     psf: tp.Union[np.array, torch.tensor],
 ) -> torch.tensor:
     """Convolve tensors (used in USRNet)."""
+
     if psf.sum() != 1:
         psf /= psf.sum()
         logging.warning('PSF has sum more than 1. Normed')
+
     if type(image) == np.ndarray:
         image = image.astype(np.float) / 255.
         image = torch.DoubleTensor(image)
